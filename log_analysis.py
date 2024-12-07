@@ -17,85 +17,98 @@ drive.mount('/content/drive')
 file_path ="/content/drive/MyDrive/sample.log"
 
 def parse_log_file(file_path, suspicious_threshold=10):
-  with open(file_path, 'r') as file:
-    log_lines = file.readlines()
 
-  ip_requests = defaultdict(int)
-  endpoint_count = defaultdict(int)
-  failed_logins = defaultdict(int)
+    with open(file_path, 'r') as file:
+        log_lines = file.readlines()
 
-  ip_pattern  = re.compile(r"^(\d+\.\d+\.\d+\.\d+)")
-  endpoint_pattern = re.compile(r'\"[A-Z]+\s(\/\S+)\sHTTP')
-  failed_login_pattern = re.compile(r"401|Invalid credentials")
-
-  for line in log_lines:
-    ip_match = ip_pattern.search(line)
-    if ip_match:
-       ip = ip_match.group()
-       ip_requests[ip] += 1
+    ip_requests = defaultdict(int)
+    endpoint_count = defaultdict(int)
+    failed_logins = defaultdict(int)
 
 
-    endpoint_match = endpoint_pattern.search(line)
-    if endpoint_match:
-      endpoint = endpoint_match.group(1)
-      endpoint_count[endpoint] += 1
+    ip_pattern = re.compile(r"^(\d+\.\d+\.\d+\.\d+)")
+    endpoint_pattern = re.compile(r'\"[A-Z]+\s(\/\S+)\sHTTP')
+    failed_login_pattern = re.compile(r"(401|Invalid credentials)")
 
-    if failed_login_pattern.search(line):
-      ip_match = ip_pattern.search(line)
-      if ip_match:
-        ip = ip_match.group()
-        failed_logins[ip] += 1
+    for line in log_lines:
 
-  suspicious_activity = {ip: count for ip, count in failed_logins.items() if count > suspicious_threshold}
-  most_accessed_endpoint = max(endpoint_count.items(), key=lambda x: x[1], default=(None, 0))
-  return ip_requests, most_accessed_endpoint, suspicious_activity
-
-def save_results_to_csv(ip_requests, most_accessed_endpoint, suspicious_activity,file_name='log_analysis_results.csv'):
-  with open(file_name, 'w', newline='') as file:
-    writer = csv.writer(file)
-
-    writer.writerow(["IP Address", "Request Count"])
-    for ip, count in sorted(ip_requests.items(), key=lambda x: x[1], reverse=True):
-      writer.writerow([ip, count])
-
-    writer.writerow([])
+        ip_match = ip_pattern.search(line)
+        if ip_match:
+            ip = ip_match.group()
+            ip_requests[ip] += 1
 
 
-    writer.writerow(["Most Accessed Endpoint", "Access Count"])
-    writer.writerow([most_accessed_endpoint[0], most_accessed_endpoint[1]])
+        endpoint_match = endpoint_pattern.search(line)
+        if endpoint_match:
+            endpoint = endpoint_match.group(1)
+            endpoint_count[endpoint] += 1
 
-    writer.writerow([])
 
-    if suspicious_activity:
-      writer.writerow(["Suspicious Activity detected"])
-      writer.writerow(["IP Address", "Failed Login Count"])
-      for ip, count in suspicious_activity.items():
-        writer.writerow([ip, count])
-    else:
-      writer.writerow(["No suspicious activity detected"])
+        if failed_login_pattern.search(line) and ip_match:
+            ip = ip_match.group()
+            failed_logins[ip] += 1
+
+
+    suspicious_activity = {ip: count for ip, count in failed_logins.items() if count > suspicious_threshold}
+    most_accessed_endpoint = max(endpoint_count.items(), key=lambda x: x[1], default=(None, 0))
+
+    return ip_requests, most_accessed_endpoint, suspicious_activity
+
+
+def save_results_to_csv(ip_requests, most_accessed_endpoint, suspicious_activity, file_name='log_analysis_results.csv'):
+
+    with open(file_name, 'w', newline='') as file:
+        writer = csv.writer(file)
+
+
+        writer.writerow(["IP Address", "Request Count"])
+        for ip, count in sorted(ip_requests.items(), key=lambda x: x[1], reverse=True):
+            writer.writerow([ip, count])
+
+        writer.writerow([])
+
+
+        writer.writerow(["Most Accessed Endpoint", "Access Count"])
+        writer.writerow([most_accessed_endpoint[0], most_accessed_endpoint[1]])
+
+        writer.writerow([])
+
+
+        if suspicious_activity:
+            writer.writerow(["Suspicious Activity Detected"])
+            writer.writerow(["IP Address", "Failed Login Count"])
+            for ip, count in suspicious_activity.items():
+                writer.writerow([ip, count])
+        else:
+            writer.writerow(["No suspicious activity detected"])
+
 
 def main():
-  file_path = "/content/drive/MyDrive/sample.log"
-  suspicious_threshold = 10
 
-  ip_requests, most_accessed_endpoint, suspicious_activity   = parse_log_file(file_path, suspicious_threshold)
 
-  print("IP Requests:")
-  for ip, count in sorted(ip_requests.items(), key=lambda x: x[1], reverse=True):
-    print(f"{ip}: {count}")
+    suspicious_threshold = 2
+    ip_requests, most_accessed_endpoint, suspicious_activity = parse_log_file(file_path, suspicious_threshold)
 
-  print("\nMost Accessed Endpoint:")
-  print(f"{most_accessed_endpoint[0]}: {most_accessed_endpoint[1]} times)\n")
 
-  if suspicious_activity:
-    print("Suspicious Activity:")
-    for ip, count in suspicious_activity.items():
-        print(f"{ip}: {count} ")
-  else:
-    print("No suspicious activity detected.")
+    print("\nIP Requests:")
+    for ip, count in sorted(ip_requests.items(), key=lambda x: x[1], reverse=True):
+        print(f"{ip}: {count}")
 
-  save_results_to_csv(ip_requests, most_accessed_endpoint, suspicious_activity)
-  print("\nResults saved to 'log_analysis_results.csv'")
+    print("\nMost Accessed Endpoint:")
+    print(f"{most_accessed_endpoint[0]}: {most_accessed_endpoint[1]} times\n")
+
+    if suspicious_activity:
+        print("Suspicious Activity Detected:")
+        for ip, count in suspicious_activity.items():
+            print(f"{ip}: {count} failed login attempts")
+    else:
+        print("No suspicious activity detected.")
+
+
+    save_results_to_csv(ip_requests, most_accessed_endpoint, suspicious_activity)
+    print("\nResults saved to 'log_analysis_results.csv'")
+
 
 if __name__ == "__main__":
     main()
+
